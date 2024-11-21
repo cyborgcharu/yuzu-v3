@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Yuzu Meet Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: #cccccc;
+        }
+        #meetingList {
+            margin-top: 20px;
+        }
+        .meeting-item {
+            border: 1px solid #eee;
+            padding: 10px;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Yuzu Meet Manager</h1>
+    
+    <div class="card">
+        <h2>Authentication</h2>
+        <button id="authButton" onclick="authenticate()">Sign in with Google</button>
+    </div>
+
+    <div class="card">
+        <h2>Create Meeting</h2>
+        <form id="createMeetingForm" onsubmit="createMeeting(event)">
+            <div>
+                <label>Title:</label>
+                <input type="text" id="meetingTitle" required>
+            </div>
+            <div>
+                <label>Start Time:</label>
+                <input type="datetime-local" id="startTime" required>
+            </div>
+            <div>
+                <label>Duration (minutes):</label>
+                <input type="number" id="duration" value="30" required>
+            </div>
+            <div>
+                <label>Attendees (comma-separated emails):</label>
+                <input type="text" id="attendees">
+            </div>
+            <button type="submit">Create Meeting</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Your Meetings</h2>
+        <button onclick="listMeetings()">Refresh Meetings</button>
+        <div id="meetingList"></div>
+    </div>
+
+    <script>
+        function authenticate() {
+            window.location.href = '/auth/google';
+        }
+
+        async function createMeeting(event) {
+            event.preventDefault();
+            
+            const attendeesString = document.getElementById('attendees').value;
+            const attendees = attendeesString.split(',').map(email => email.trim()).filter(email => email);
+
+            const meetingData = {
+                title: document.getElementById('meetingTitle').value,
+                startTime: new Date(document.getElementById('startTime').value).toISOString(),
+                duration: parseInt(document.getElementById('duration').value),
+                attendees: attendees
+            };
+
+            try {
+                const response = await fetch('/api/meetings/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(meetingData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                alert('Meeting created successfully! Meet link: ' + result.meetLink);
+                listMeetings();
+            } catch (error) {
+                alert('Error creating meeting: ' + error.message);
+            }
+        }
+
+        async function listMeetings() {
+            try {
+                const response = await fetch('/api/meetings');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const meetings = await response.json();
+                const listElement = document.getElementById('meetingList');
+                listElement.innerHTML = '';
+
+                meetings.forEach(meeting => {
+                    const meetingElement = document.createElement('div');
+                    meetingElement.className = 'meeting-item';
+                    meetingElement.innerHTML = `
+                        <h3>${meeting.title}</h3>
+                        <p>Start: ${new Date(meeting.startTime).toLocaleString()}</p>
+                        <p>Meet Link: <a href="${meeting.meetLink}" target="_blank">${meeting.meetLink}</a></p>
+                        <button onclick="joinMeeting('${meeting.id}')">Join Meeting</button>
+                    `;
+                    listElement.appendChild(meetingElement);
+                });
+            } catch (error) {
+                console.error('Error listing meetings:', error);
+                alert('Error loading meetings: ' + error.message);
+            }
+        }
+
+        async function joinMeeting(meetingId) {
+            try {
+                const response = await fetch(`/api/meetings/${meetingId}/join`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const meeting = await response.json();
+                window.open(meeting.meetLink, '_blank');
+            } catch (error) {
+                alert('Error joining meeting: ' + error.message);
+            }
+        }
+
+        // Load meetings on page load
+        window.onload = listMeetings;
+    </script>
+</body>
+</html>

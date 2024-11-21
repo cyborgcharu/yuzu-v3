@@ -2,6 +2,9 @@ const express = require('express');
 const dotenv = require('dotenv');
 const { OAuth2Client } = require('google-auth-library');
 const session = require('express-session');
+const { google } = require('googleapis');
+const path = require('path');
+
 
 dotenv.config();
 
@@ -14,13 +17,20 @@ app.use(session({
   cookie: { secure: false }
 }));
 
+app.use(express.json());
+app.use(express.static('public'));
+
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 const oauth2Client = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   redirectUri: process.env.REDIRECT_URI
 });
 
-// Updated scopes to match exactly what's configured in Google Cloud Console
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events',
@@ -35,29 +45,15 @@ app.get('/auth/google', (req, res) => {
     include_granted_scopes: true,
     prompt: 'consent'
   });
-  console.log('Generated Auth URL:', authUrl); // For debugging
   res.redirect(authUrl);
 });
 
 app.get('/auth/callback', async (req, res) => {
   try {
     const { code } = req.query;
-    console.log('Received code:', code); // For debugging
-    
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
-    
     req.session.tokens = tokens;
-    
-    console.log('Authentication successful!');
-    console.log('Access Token:', tokens.access_token);
-    
-    // Add a simple test API call to verify authentication
-    const { google } = require('googleapis');
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-    
-    const calendarResponse = await calendar.calendarList.list();
-    console.log('Successfully accessed calendar:', calendarResponse.data.items.length, 'calendars found');
     
     res.send(`
       <html>
@@ -78,41 +74,128 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
-// Add a test endpoint
-app.get('/test', async (req, res) => {
+app.get('/api/meetings', async (req, res) => {
   if (!req.session.tokens) {
-    return res.status(401).send('Not authenticated. Please visit /auth/google first');
+    return res.status(401).json({ error: 'Not authenticated' });
   }
 
   try {
     oauth2Client.setCredentials(req.session.tokens);
-    const { google } = require('googleapis');
-    
-    // Test Calendar API
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-    const calendarResponse = await calendar.calendarList.list();
-    
-    // Test Meet API
-    const meet = google.calendar({ version: 'v1', auth: oauth2Client });
-    // Note: We'll add specific Meet API calls here once auth is working
-    
+
+    const response = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin: new Date().toISOString(),
+      maxResults: 10,
+      singleEvents: true,
+      orderBy: 'startTime',
+      q: 'meet.google.com'
+    });
+
+    const meetings = response.data.items
+      .filter(event => event.hangoutLink)
+      .map(event => ({
+        id: event.id,
+        title: event.summary,
+        startTime: event.start.dateTime,
+        endTime: event.end.dateTime,
+        meetLink: event.hangoutLink,
+        attendees: event.attendees || []
+      }));
+
+    res.json(meetings);
+  } catch (error) {
+    console.error('Error fetching meetings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/meetings/create', async (req, res) => {
+  if (!req.session.tokens) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    oauth2Client.setCredentials(req.session.tokens);
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const { title, startTime, duration, attendees } = req.body;
+    const attendeesList = attendees && Array.isArray(attendees) 
+      ? attendees.map(email => ({ email })) 
+      : [];
+
+    const event = {
+      summary: title,
+      start: {
+        dateTime: new Date(startTime).toISOString(),
+        timeZone: 'UTC'
+      },
+      end: {
+        dateTime: new Date(new Date(startTime).getTime() + duration * 60000).toISOString(),
+        timeZone: 'UTC'
+      },
+      attendees: attendeesList,
+      conferenceData: {
+        createRequest: {
+          requestId: Date.now() + '-' + Math.random().toString(36).substring(7),
+          conferenceSolutionKey: {
+            type: 'hangoutsMeet'
+          }
+        }
+      }
+    };
+
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      requestBody: event,
+      conferenceDataVersion: 1
+    });
+
     res.json({
-      status: 'success',
-      calendars: calendarResponse.data.items.length,
-      message: 'APIs accessed successfully'
+      id: response.data.id,
+      meetLink: response.data.hangoutLink,
+      title: response.data.summary,
+      startTime: response.data.start.dateTime,
+      endTime: response.data.end.dateTime
     });
   } catch (error) {
-    console.error('API Test Error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: error.message
+    console.error('Error creating meeting:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/meetings/:meetingId/join', async (req, res) => {
+  if (!req.session.tokens) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    oauth2Client.setCredentials(req.session.tokens);
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const event = await calendar.events.get({
+      calendarId: 'primary',
+      eventId: req.params.meetingId
     });
+
+    if (!event.data.hangoutLink) {
+      throw new Error('No meeting link available');
+    }
+
+    res.json({
+      meetLink: event.data.hangoutLink,
+      title: event.data.summary,
+      startTime: event.data.start.dateTime,
+      endTime: event.data.end.dateTime
+    });
+  } catch (error) {
+    console.error('Error joining meeting:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Auth endpoint: http://localhost:${PORT}/auth/google`);
-  console.log(`Test endpoint: http://localhost:${PORT}/test`);
+  console.log(`Visit http://localhost:${PORT}/auth/google to authenticate`);
 });
