@@ -20,8 +20,8 @@ app.use(session({
 app.use(express.json());
 app.use(express.static('public'));
 
-
 app.get('/', (req, res) => {
+  console.log('Serving index.html');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -39,6 +39,7 @@ const SCOPES = [
 ];
 
 app.get('/auth/google', (req, res) => {
+  console.log('Redirecting to Google OAuth');
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
@@ -49,25 +50,16 @@ app.get('/auth/google', (req, res) => {
 });
 
 app.get('/auth/callback', async (req, res) => {
+  console.log('Received callback from Google OAuth');
   try {
     const { code } = req.query;
+    console.log('Exchanging authorization code for tokens');
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
     req.session.tokens = tokens;
     
-    res.send(`
-      <html>
-        <body>
-          <h1>Authentication successful!</h1>
-          <p>You can close this window and return to the application.</p>
-          <script>
-            setTimeout(() => {
-              window.close();
-            }, 3000);
-          </script>
-        </body>
-      </html>
-    `);
+    console.log('Authentication successful, redirecting to root');
+    res.redirect('/');
   } catch (error) {
     console.error('Error during authentication:', error);
     res.status(500).send(`Authentication failed: ${error.message}`);
