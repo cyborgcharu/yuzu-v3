@@ -1,86 +1,158 @@
 // src/utils/server.js
 import express from 'express';
 import session from 'express-session';
-import { OAuth2Client } from 'google-auth-library';
-import { google } from 'googleapis';
-import dotenv from 'dotenv';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { google } from 'googleapis';
+import { googleAuthService } from '../services/googleAuthService.js';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
 const app = express();
 
-// Enable CORS for development
+// Constants
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8080';
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// Session configuration
+const sessionConfig = {
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: !isDevelopment, // true in production
+    sameSite: 'lax',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  },
+  name: 'yuzu.sid'
+};
+
+// Middleware setup
 app.use(cors({
-  origin: 'http://localhost:8080',
-  credentials: true
+  origin: FRONTEND_URL,
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Set-Cookie']
 }));
 
 app.use(express.json());
+app.use(session(sessionConfig));
 
-// Session middleware
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { 
-    secure: false, // Set to true in production with HTTPS
-    sameSite: 'lax',
-    httpOnly: true
-  }
-}));
-
-const oauth2Client = new OAuth2Client({
-  clientId: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  redirectUri: process.env.REDIRECT_URI
-});
+// Debug middleware for development
+if (isDevelopment) {
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`, {
+      sessionId: req.sessionID,
+      hasTokens: !!req.session?.tokens,
+      hasUser: !!req.session?.user
+    });
+    next();
+  });
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV
+  });
 });
 
 // Auth routes
 app.get('/auth/google', (req, res) => {
-  console.log('Redirecting to Google OAuth');
-  const authUrl = oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events'
-    ],
-    include_granted_scopes: true
-  });
+  console.log('Starting Google auth flow');
+  const authUrl = googleAuthService.generateAuthUrl();
+  console.log('Redirecting to:', authUrl);
   res.redirect(authUrl);
 });
 
 app.get('/auth/callback', async (req, res) => {
+  console.log('Received auth callback');
   try {
     const { code } = req.query;
-    console.log('Received auth code:', code);
-    const { tokens } = await oauth2Client.getToken(code);
+    if (!code) {
+      console.log('No auth code received');
+      return res.redirect(`${FRONTEND_URL}/auth/google`);
+    }
+
+    // Get tokens from Google
+    console.log('Getting tokens from Google');
+    const tokens = await googleAuthService.getTokens(code);
+    
+    // Get user info
+    console.log('Getting user info');
+    const oauth2Client = googleAuthService.getClient();
+    oauth2Client.setCredentials(tokens);
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const userInfo = await oauth2.userinfo.get();
+    
+    // Save to session
     req.session.tokens = tokens;
-    res.redirect('http://localhost:8080');
+    req.session.user = {
+      email: userInfo.data.email,
+      name: userInfo.data.name,
+      picture: userInfo.data.picture
+    };
+
+    // Save session explicitly before redirect
+    console.log('Saving session');
+    return new Promise((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+          res.redirect(`${FRONTEND_URL}/auth/google`);
+          reject(err);
+        } else {
+          console.log('Session saved, redirecting to frontend');
+          res.redirect(`${FRONTEND_URL}/auth/google?auth=success`);
+          resolve();
+        }
+      });
+    });
+
   } catch (error) {
     console.error('Auth error:', error);
-    res.status(500).json({ error: 'Authentication failed' });
+    res.redirect(`${FRONTEND_URL}/auth/google?error=${encodeURIComponent(error.message)}`);
   }
 });
 
 app.get('/auth/status', (req, res) => {
-  res.json({ 
-    isAuthenticated: !!req.session.tokens,
-    user: req.session.user
+  console.log('Checking auth status');
+  const isAuthenticated = !!req.session?.tokens;
+  
+  res.json({
+    isAuthenticated,
+    user: isAuthenticated ? req.session.user : null
   });
 });
 
+app.get('/auth/logout', (req, res) => {
+  console.log('Processing logout');
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Logout error:', err);
+      return res.status(500).json({ error: 'Logout failed' });
+    }
+    res.json({ success: true });
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server Error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: isDevelopment ? err.message : undefined
+  });
+});
+
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Backend server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('Frontend URL:', FRONTEND_URL);
 });
