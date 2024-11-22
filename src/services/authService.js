@@ -1,14 +1,42 @@
 // src/services/AuthService.js
 class AuthService {
-  async startAuth() {
-    window.location.href = '/auth/google';
+  async getUser() {
+    try {
+      const response = await fetch('/auth/user', {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch user: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      throw error;
+    }
   }
-  
-  async checkAuthStatus() {
-    const response = await fetch('/auth/status', {
-      credentials: 'include'
-    });
-    return response.json();
+
+  startAuth() {
+    try {
+      return window.location.href = '/auth/google';
+    } catch (error) {
+      throw new Error('Failed to start authentication');
+    }
+  }
+
+  async logout() {
+    try {
+      const response = await fetch('/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Logout failed');
+      }
+      return await response.json();
+    } catch (error) {
+      throw error;
+    }
   }
 }
 
