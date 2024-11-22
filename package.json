@@ -5,5 +5,29 @@
     "express-session": "^1.18.1",
     "google-auth-library": "^8.9.0",
     "googleapis": "^118.0.0"
-  }
+  },
+  "name": "yuzu-google_meet",
+  "description": "",
+  "version": "1.0.0",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cyborgcharu/yuzu-google_meet.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cyborgcharu/yuzu-google_meet/issues"
+  },
+  "homepage": "https://github.com/cyborgcharu/yuzu-google_meet#readme"
 }

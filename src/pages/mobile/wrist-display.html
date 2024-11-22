@@ -1,0 +1,136 @@
+<!-- src/pages/mobile/wrist-display.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Wrist-Worn App</title>
+  <script src="https://www.gstatic.com/firebasejs/9.21.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.21.0/firebase-database-compat.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #1E2432;
+      color: white;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    .wrist-display {
+      background-color: #2C3443;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      width: 320px;
+    }
+
+    .time {
+      font-size: 32px;
+      font-weight: bold;
+      text-align: right;
+      margin-bottom: 8px;
+    }
+
+    .meeting-info {
+      background-color: #4C5565;
+      border-radius: 4px;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .meeting-info span {
+      font-size: 14px;
+    }
+
+    .video-controls {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .video-controls button {
+      background-color: #4C5565;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 12px;
+      font-size: 16px;
+      margin: 0 8px;
+      cursor: pointer;
+    }
+
+    .video-controls button i {
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="wrist-display">
+      <div class="time" id="time"></div>
+      <div class="meeting-info">
+        <span>Meet with Alex Johnson</span>
+        <span>12:42</span>
+      </div>
+      <div class="video-controls">
+        <button id="mute-button"><i class="fas fa-microphone-slash"></i></button>
+        <button id="video-button"><i class="fas fa-video"></i></button>
+        <button id="settings-button"><i class="fas fa-cog"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import firebase from 'firebase/app';
+    import 'firebase/database';
+    import MeetService from '../../services/meetService.js';
+
+    // Initialize Firebase
+    const firebaseConfig = {
+      databaseURL: 'https://yuzu-meet-default-rtdb.firebaseio.com/'
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    const meetService = new MeetService();
+
+    // Update time every second
+    function updateTime() {
+      const currentTime = new Date().toLocaleTimeString();
+      document.getElementById('time').textContent = currentTime;
+    }
+    setInterval(updateTime, 1000);
+
+    // Handle video call controls
+    document.getElementById('mute-button').addEventListener('click', async () => {
+      try {
+        await meetService.toggleMute();
+      } catch (error) {
+        console.error('Error toggling mute:', error);
+      }
+    });
+
+    // Add event handlers for video and settings buttons
+    document.getElementById('video-button').addEventListener('click', async () => {
+      try {
+        await meetService.toggleVideo();
+      } catch (error) {
+        console.error('Error toggling video:', error);
+      }
+    });
+
+    document.getElementById('settings-button').addEventListener('click', () => {
+      // Handle settings button click
+    });
+  </script>
+</body>
+</html>

@@ -1,6 +1,8 @@
-// meetService.js
+// src/services/meetService.js
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
+import firebase from 'firebase/app';
+import 'firebase/database';
 
 class MeetService {
   constructor() {
@@ -94,3 +96,27 @@ class MeetService {
     return stream;
   }
 }
+
+const getMeetData = async () => {
+  const snapshot = await firebase.database().ref('meetData').once('value');
+  return snapshot.val();
+};
+
+const toggleMute = async () => {
+  await firebase.database().ref('meetData/isMuted').set(!isMuted);
+};
+
+const toggleVideo = async () => {
+  await firebase.database().ref('meetData/isVideoOn').set(!isVideoOn);
+};
+
+const toggleCamera = async () => {
+  await firebase.database().ref('meetData/cameraActive').set(!cameraActive);
+};
+
+export default {
+  getMeetData,
+  toggleMute,
+  toggleVideo,
+  toggleCamera
+};

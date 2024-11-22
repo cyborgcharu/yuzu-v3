@@ -1,0 +1,150 @@
+<!-- src/pages/glasses/inline-display.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yuzu Meet - Smart Glasses HUD</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        
+        .glass-overlay {
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(4px);
+        }
+
+        .controls-container {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .participant-avatar {
+            background: #475569;
+            color: white;
+        }
+
+        .control-button {
+            background: #334155;
+            transition: all 0.2s;
+        }
+
+        .control-button:hover {
+            background: #475569;
+        }
+
+        .control-button.active {
+            background: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/javascript">
+        const { useState, useEffect } = React;
+        
+        function HUDDisplay() {
+            const [currentTime, setCurrentTime] = useState('12:42');
+            const [isMuted, setIsMuted] = useState(false);
+            const [isVideoOff, setIsVideoOff] = useState(false);
+            const [participantName, setParticipantName] = useState('Alex Johnson');
+
+            useEffect(() => {
+                // Update time every minute
+                const timer = setInterval(() => {
+                    const now = new Date();
+                    setCurrentTime(now.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    }));
+                }, 60000);
+
+                // Listen for messages from wrist display
+                window.addEventListener('message', (event) => {
+                    // Handle commands from wrist display
+                    const { type, data } = event.data;
+                    switch(type) {
+                        case 'UPDATE_PARTICIPANT':
+                            setParticipantName(data.name);
+                            break;
+                        case 'TOGGLE_MUTE':
+                            setIsMuted(prev => !prev);
+                            break;
+                        case 'TOGGLE_VIDEO':
+                            setIsVideoOff(prev => !prev);
+                            break;
+                    }
+                });
+
+                return () => clearInterval(timer);
+            }, []);
+
+            return React.createElement('div', {
+                className: 'fixed inset-0 glass-overlay text-white'
+            },
+                // Time display
+                React.createElement('div', {
+                    className: 'absolute top-4 right-4 text-sm opacity-80'
+                }, currentTime),
+
+                // Main content
+                React.createElement('div', {
+                    className: 'h-full flex flex-col items-center justify-center'
+                },
+                    isVideoOff ?
+                        React.createElement('div', {
+                            className: 'participant-avatar w-16 h-16 rounded-full flex items-center justify-center text-2xl mb-4'
+                        }, participantName.charAt(0)) :
+                        React.createElement('div', {
+                            className: 'relative w-64 h-48 bg-slate-800 rounded-lg mb-4'
+                        },
+                            React.createElement('div', {
+                                className: 'absolute bottom-2 right-2 participant-avatar w-8 h-8 rounded-full flex items-center justify-center text-sm'
+                            }, participantName.charAt(0))
+                        ),
+
+                    // Controls
+                    React.createElement('div', {
+                        className: 'controls-container fixed bottom-8 left-1/2 transform -translate-x-1/2 rounded-lg p-2'
+                    },
+                        React.createElement('div', {
+                            className: 'flex space-x-4'
+                        },
+                            // Mute button
+                            React.createElement('button', {
+                                className: `control-button p-2 rounded-full ${isMuted ? 'active' : ''}`,
+                                onClick: () => setIsMuted(prev => !prev)
+                            }, 'Mic'),
+                            // Video button
+                            React.createElement('button', {
+                                className: `control-button p-2 rounded-full ${isVideoOff ? 'active' : ''}`,
+                                onClick: () => setIsVideoOff(prev => !prev)
+                            }, 'Cam'),
+                            // Settings button
+                            React.createElement('button', {
+                                className: 'control-button p-2 rounded-full',
+                                onClick: () => console.log('Settings clicked')
+                            }, 'Set')
+                        )
+                    )
+                )
+            );
+        }
+
+        // Mount the React app
+        ReactDOM.render(
+            React.createElement(HUDDisplay),
+            document.getElementById('root')
+        );
+    </script>
+</body>
+</html>
