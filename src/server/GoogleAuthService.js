@@ -6,13 +6,18 @@ class GoogleAuthService {
     this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      'http://localhost:3000/auth/callback' 
+      'http://localhost:3000/auth/callback'
     );
+  }
+
+  getClient() {
+    return this.oauth2Client;
   }
 
   generateAuthUrl() {
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
+      prompt: 'consent', // Force consent to get refresh token
       scope: [
         'https://www.googleapis.com/auth/userinfo.profile',
         'https://www.googleapis.com/auth/userinfo.email'
@@ -21,11 +26,12 @@ class GoogleAuthService {
   }
 
   async getTokens(code) {
-    return await this.oauth2Client.getToken(code);
-  }
-
-  getClient() {
-    return this.oauth2Client;
+    try {
+      return await this.oauth2Client.getToken(code);
+    } catch (error) {
+      console.error('Error getting tokens:', error);
+      throw error;
+    }
   }
 }
 

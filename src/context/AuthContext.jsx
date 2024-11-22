@@ -8,42 +8,37 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   
   const authService = new AuthService();
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
 
   const checkAuth = async () => {
     try {
       setError(null);
       const userData = await authService.getUser();
       setUser(userData);
+      setIsAuthenticated(true);
     } catch (error) {
       console.error('Auth check failed:', error);
-      setError(error.message);
       setUser(null);
+      setIsAuthenticated(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const login = () => {
-    try {
-      authService.startAuth();
-    } catch (error) {
-      console.error('Login failed:', error);
-      setError(error.message);
-    }
-  };
+  useEffect(() => {
+    checkAuth();
+  }, []);
 
   const value = {
     user,
     loading,
     error,
-    login,
-    checkAuth
+    isAuthenticated,
+    checkAuth,
+    setUser,
+    setIsAuthenticated
   };
 
   return (
@@ -58,4 +53,3 @@ export function useAuth() {
 }
 
 export { AuthContext };
-export default AuthContext;
