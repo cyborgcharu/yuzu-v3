@@ -10,6 +10,8 @@ import {
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginButton from '@/components/LoginButton';
+import { GlassesMeetDisplay } from './interfaces/glasses/MeetDisplay';
+
 
 function Navigation() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -98,14 +100,6 @@ function AuthFailure() {
   );
 }
 
-function GlassesPage() {
-  return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Glasses Interface</h1>
-      <p>You are logged in and viewing the glasses interface.</p>
-    </div>
-  );
-}
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -139,7 +133,7 @@ function App() {
                 path="/glasses" 
                 element={
                   <ProtectedRoute>
-                    <GlassesPage />
+                    <GlassesMeetDisplay />
                   </ProtectedRoute>
                 } 
               />

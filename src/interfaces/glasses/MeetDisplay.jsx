@@ -12,10 +12,11 @@ export function GlassesMeetDisplay() {
     connectDevice,
     disconnectDevice,
     isMuted,
-    isVideoOn,
-    isConnected,
+    isVideoOff,
+    deviceStates,
     currentMeeting,
-    upcomingMeetings,
+    meetings,
+    isLoading,
     fetchUpcomingMeetings
   } = useMeet();
 
@@ -38,7 +39,7 @@ export function GlassesMeetDisplay() {
             onClick={() => toggleMute('glasses')}
             className={`px-4 py-2 rounded ${
               isMuted ? 'bg-red-500' : 'bg-green-500'
-            } text-white`}
+            } text-white transition-colors`}
           >
             {isMuted ? 'Unmute' : 'Mute'}
           </button>
@@ -46,11 +47,21 @@ export function GlassesMeetDisplay() {
           <button
             onClick={() => toggleVideo('glasses')}
             className={`px-4 py-2 rounded ${
-              isVideoOn ? 'bg-green-500' : 'bg-red-500'
-            } text-white`}
+              isVideoOff ? 'bg-red-500' : 'bg-green-500'
+            } text-white transition-colors`}
           >
-            {isVideoOn ? 'Turn Off Video' : 'Turn On Video'}
+            {isVideoOff ? 'Turn On Video' : 'Turn Off Video'}
           </button>
+        </div>
+
+        <div className="mb-4">
+          <h3 className="font-bold mb-2">Device Status</h3>
+          <p className="text-sm">
+            Glasses: {deviceStates.glasses.connected ? 'Connected' : 'Disconnected'}
+            {deviceStates.glasses.connected && 
+              ` - Battery: ${deviceStates.glasses.batteryLevel}%`
+            }
+          </p>
         </div>
 
         {currentMeeting && (
@@ -61,11 +72,11 @@ export function GlassesMeetDisplay() {
           </div>
         )}
 
-        {upcomingMeetings?.length > 0 && (
+        {meetings?.length > 0 && (
           <div>
             <h3 className="font-bold mb-2">Upcoming Meetings</h3>
             <ul className="space-y-2">
-              {upcomingMeetings.map(meeting => (
+              {meetings.map(meeting => (
                 <li key={meeting.id} className="p-2 bg-gray-100 rounded">
                   <p className="font-medium">{meeting.title}</p>
                   <p className="text-sm text-gray-600">
@@ -74,6 +85,12 @@ export function GlassesMeetDisplay() {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="text-center py-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
           </div>
         )}
       </Card>
