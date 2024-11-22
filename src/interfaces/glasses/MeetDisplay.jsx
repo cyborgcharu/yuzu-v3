@@ -1,40 +1,82 @@
 // src/interfaces/glasses/MeetDisplay.jsx
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { useMeet } from '../../hooks/useMeet';
-import { MeetingControls } from '../../components/MeetingControls';
+import { Card } from '../../components/ui/card';
 
 export function GlassesMeetDisplay() {
-  const { currentMeeting, currentTime, deviceStates } = useMeet();
+  const { user } = useAuth();
+  const { 
+    toggleMute, 
+    toggleVideo, 
+    connectDevice,
+    disconnectDevice,
+    isMuted,
+    isVideoOn,
+    isConnected,
+    currentMeeting,
+    upcomingMeetings,
+    fetchUpcomingMeetings
+  } = useMeet();
+
+  useEffect(() => {
+    // Connect glasses device when component mounts
+    connectDevice('glasses');
+    fetchUpcomingMeetings();
+
+    // Cleanup on unmount
+    return () => disconnectDevice('glasses');
+  }, []);
 
   return (
-    <div className="fixed inset-0 bg-black/90 text-white">
-      <div className="absolute top-4 right-4 flex items-center space-x-4">
-        <span className="text-sm opacity-80">{currentTime}</span>
-        {Object.entries(deviceStates).map(([device, state]) => (
-          <div key={device} className={`h-2 w-2 rounded-full ${
-            state.connected ? 'bg-green-500' : 'bg-red-500'
-          }`} title={`${device}: ${state.connected ? 'Connected' : 'Disconnected'}`} />
-        ))}
-      </div>
+    <div className="space-y-4">
+      <Card className="p-4">
+        <h2 className="text-xl font-bold mb-4">Glasses Interface</h2>
+        
+        <div className="flex space-x-4 mb-4">
+          <button
+            onClick={() => toggleMute('glasses')}
+            className={`px-4 py-2 rounded ${
+              isMuted ? 'bg-red-500' : 'bg-green-500'
+            } text-white`}
+          >
+            {isMuted ? 'Unmute' : 'Mute'}
+          </button>
+          
+          <button
+            onClick={() => toggleVideo('glasses')}
+            className={`px-4 py-2 rounded ${
+              isVideoOn ? 'bg-green-500' : 'bg-red-500'
+            } text-white`}
+          >
+            {isVideoOn ? 'Turn Off Video' : 'Turn On Video'}
+          </button>
+        </div>
 
-      <div className="h-full flex flex-col items-center justify-center">
-        {currentMeeting ? (
-          <div className="text-center mb-8">
-            <h2 className="text-xl font-semibold">{currentMeeting.title}</h2>
-            <p className="text-sm opacity-80">
-              {new Date(currentMeeting.startTime).toLocaleString()}
-            </p>
-          </div>
-        ) : (
-          <div className="text-center mb-8 opacity-50">
-            <p>No active meeting</p>
+        {currentMeeting && (
+          <div className="mb-4">
+            <h3 className="font-bold">Current Meeting</h3>
+            <p>{currentMeeting.title}</p>
+            <p>Duration: {currentMeeting.duration} minutes</p>
           </div>
         )}
 
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-md">
-          <MeetingControls interfaceType="glasses" />
-        </div>
-      </div>
+        {upcomingMeetings?.length > 0 && (
+          <div>
+            <h3 className="font-bold mb-2">Upcoming Meetings</h3>
+            <ul className="space-y-2">
+              {upcomingMeetings.map(meeting => (
+                <li key={meeting.id} className="p-2 bg-gray-100 rounded">
+                  <p className="font-medium">{meeting.title}</p>
+                  <p className="text-sm text-gray-600">
+                    {new Date(meeting.startTime).toLocaleString()}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
