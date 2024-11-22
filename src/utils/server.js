@@ -1,64 +1,37 @@
-const express = require('express');
-const dotenv = require('dotenv');
-const { OAuth2Client } = require('google-auth-library');
-const session = require('express-session');
-const { google } = require('googleapis');
-const path = require('path');
+// src/utils/server.js
+import express from 'express';
+import session from 'express-session';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { googleAuthService } from '../services/googleAuthService';
+import { meetingService } from '../services/meetingService';
 
-
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
 app.use(session({
-  secret: 'your-secret-key',
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: true,
-  cookie: { secure: false }
+  cookie: { secure: process.env.NODE_ENV === 'production' }
 }));
 
 app.use(express.json());
 app.use(express.static('public'));
 
-app.get('/', (req, res) => {
-  console.log('Serving index.html');
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-const oauth2Client = new OAuth2Client({
-  clientId: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  redirectUri: process.env.REDIRECT_URI
-});
-
-const SCOPES = [
-  'https://www.googleapis.com/auth/calendar',
-  'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/meetings.space.created',
-  'https://www.googleapis.com/auth/meetings.space.readonly'
-];
-
+// Auth routes
 app.get('/auth/google', (req, res) => {
   console.log('Redirecting to Google OAuth');
-  const authUrl = oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: SCOPES,
-    include_granted_scopes: true,
-    prompt: 'consent'
-  });
+  const authUrl = googleAuthService.generateAuthUrl();
   res.redirect(authUrl);
 });
 
 app.get('/auth/callback', async (req, res) => {
-  console.log('Received callback from Google OAuth');
   try {
-    const { code } = req.query;
-    console.log('Exchanging authorization code for tokens');
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
+    const tokens = await googleAuthService.getTokens(req.query.code);
     req.session.tokens = tokens;
-    
-    console.log('Authentication successful, redirecting to root');
     res.redirect('/');
   } catch (error) {
     console.error('Error during authentication:', error);
@@ -66,35 +39,14 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
+// Meeting routes
 app.get('/api/meetings', async (req, res) => {
   if (!req.session.tokens) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   try {
-    oauth2Client.setCredentials(req.session.tokens);
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-
-    const response = await calendar.events.list({
-      calendarId: 'primary',
-      timeMin: new Date().toISOString(),
-      maxResults: 10,
-      singleEvents: true,
-      orderBy: 'startTime',
-      q: 'meet.google.com'
-    });
-
-    const meetings = response.data.items
-      .filter(event => event.hangoutLink)
-      .map(event => ({
-        id: event.id,
-        title: event.summary,
-        startTime: event.start.dateTime,
-        endTime: event.end.dateTime,
-        meetLink: event.hangoutLink,
-        attendees: event.attendees || []
-      }));
-
+    const meetings = await meetingService.listMeetings(req.session.tokens);
     res.json(meetings);
   } catch (error) {
     console.error('Error fetching meetings:', error);
@@ -108,48 +60,8 @@ app.post('/api/meetings/create', async (req, res) => {
   }
 
   try {
-    oauth2Client.setCredentials(req.session.tokens);
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-
-    const { title, startTime, duration, attendees } = req.body;
-    const attendeesList = attendees && Array.isArray(attendees) 
-      ? attendees.map(email => ({ email })) 
-      : [];
-
-    const event = {
-      summary: title,
-      start: {
-        dateTime: new Date(startTime).toISOString(),
-        timeZone: 'UTC'
-      },
-      end: {
-        dateTime: new Date(new Date(startTime).getTime() + duration * 60000).toISOString(),
-        timeZone: 'UTC'
-      },
-      attendees: attendeesList,
-      conferenceData: {
-        createRequest: {
-          requestId: Date.now() + '-' + Math.random().toString(36).substring(7),
-          conferenceSolutionKey: {
-            type: 'hangoutsMeet'
-          }
-        }
-      }
-    };
-
-    const response = await calendar.events.insert({
-      calendarId: 'primary',
-      requestBody: event,
-      conferenceDataVersion: 1
-    });
-
-    res.json({
-      id: response.data.id,
-      meetLink: response.data.hangoutLink,
-      title: response.data.summary,
-      startTime: response.data.start.dateTime,
-      endTime: response.data.end.dateTime
-    });
+    const meeting = await meetingService.createMeeting(req.session.tokens, req.body);
+    res.json(meeting);
   } catch (error) {
     console.error('Error creating meeting:', error);
     res.status(500).json({ error: error.message });
@@ -162,28 +74,17 @@ app.get('/api/meetings/:meetingId/join', async (req, res) => {
   }
 
   try {
-    oauth2Client.setCredentials(req.session.tokens);
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-
-    const event = await calendar.events.get({
-      calendarId: 'primary',
-      eventId: req.params.meetingId
-    });
-
-    if (!event.data.hangoutLink) {
-      throw new Error('No meeting link available');
-    }
-
-    res.json({
-      meetLink: event.data.hangoutLink,
-      title: event.data.summary,
-      startTime: event.data.start.dateTime,
-      endTime: event.data.end.dateTime
-    });
+    const meeting = await meetingService.getMeeting(req.session.tokens, req.params.meetingId);
+    res.json(meeting);
   } catch (error) {
     console.error('Error joining meeting:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Serve React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../public', 'index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
