@@ -26,11 +26,11 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-key',
   resave: true,
   saveUninitialized: true,
-  cookie: { 
+  cookie: {
     secure: false,
     sameSite: 'lax',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000
+    maxAge: 24 * 60 * 60 * 1000  // 24 hours
   }
 }));
 
@@ -52,10 +52,13 @@ app.get('/auth/callback', async (req, res) => {
     const { code } = req.query;
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
-    
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const userInfo = await oauth2.userinfo.get();
 
+    const oauth2 = google.oauth2({
+      version: 'v2',
+      auth: oauth2Client
+    });
+
+    const userInfo = await oauth2.userinfo.get();
     req.session.tokens = tokens;
     req.session.user = userInfo.data;
 
@@ -88,6 +91,13 @@ app.post('/auth/logout', (req, res) => {
   });
 });
 
-app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });
