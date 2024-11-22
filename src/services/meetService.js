@@ -8,6 +8,10 @@ class MeetService {
       participants: [],
       currentTime: this.getCurrentTime(),
       activeInterface: null,
+      meetings: [],
+      isLoading: false,
+      error: null,
+      googleAuthStatus: 'unauthorized',
       deviceStates: {
         glasses: { connected: false, batteryLevel: 100 },
         wrist: { connected: false, batteryLevel: 100 },
@@ -32,28 +36,11 @@ class MeetService {
     // Handle tab visibility changes
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        // Request latest state when tab becomes visible
         this.broadcastChannel.postMessage({ type: 'REQUEST_STATE' });
       }
     });
-
-    // Listen for state requests from other tabs
-    this.broadcastChannel.onmessage = (event) => {
-      if (event.data.type === 'REQUEST_STATE') {
-        // Respond with current state
-        this.broadcastChannel.postMessage({
-          type: 'STATE_UPDATE',
-          state: this.state
-        });
-      } else if (event.data.type === 'STATE_UPDATE') {
-        // Update local state
-        this.state = event.data.state;
-        this.notifyListeners();
-      }
-    };
   }
 
-  // State management
   subscribe(listener) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -70,7 +57,6 @@ class MeetService {
       activeInterface: source
     };
     
-    // Broadcast state update to other tabs
     this.broadcastChannel.postMessage({
       type: 'STATE_UPDATE',
       state: this.state
@@ -79,7 +65,6 @@ class MeetService {
     this.notifyListeners();
   }
 
-  // Time management
   getCurrentTime() {
     return new Date().toLocaleTimeString('en-US', {
       hour: '2-digit',
@@ -94,7 +79,6 @@ class MeetService {
     }, 60000);
   }
 
-  // Meeting controls
   toggleMute(source) {
     this.updateState({ 
       isMuted: !this.state.isMuted 
@@ -107,7 +91,6 @@ class MeetService {
     }, source);
   }
 
-  // Device management
   connectDevice(deviceType) {
     const deviceStates = {
       ...this.state.deviceStates,
@@ -130,26 +113,68 @@ class MeetService {
     this.updateState({ deviceStates }, deviceType);
   }
 
-  // Meeting management
-  setCurrentMeeting(meetingDetails) {
-    this.updateState({ 
-      currentMeeting: meetingDetails 
-    }, 'system');
+  async fetchUpcomingMeetings() {
+    this.updateState({ isLoading: true }, 'system');
+    try {
+      const response = await fetch('/api/meetings');
+      if (!response.ok) throw new Error('Failed to fetch meetings');
+      
+      const meetings = await response.json();
+      this.updateState({ 
+        meetings,
+        isLoading: false 
+      }, 'system');
+      
+      return meetings;
+    } catch (error) {
+      this.updateState({ 
+        error: error.message,
+        isLoading: false 
+      }, 'system');
+      throw error;
+    }
   }
 
-  updateParticipants(participants) {
-    this.updateState({ participants }, 'system');
+  async createMeeting({ title, startTime, duration = 30, attendees = [] }) {
+    this.updateState({ isLoading: true }, 'system');
+    try {
+      const response = await fetch('/api/meetings/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title,
+          startTime,
+          duration,
+          attendees
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to create meeting');
+      
+      const meeting = await response.json();
+      const updatedMeetings = [...this.state.meetings, meeting];
+      
+      this.updateState({ 
+        meetings: updatedMeetings,
+        currentMeeting: meeting,
+        isLoading: false 
+      }, 'system');
+      
+      return meeting;
+    } catch (error) {
+      this.updateState({ 
+        error: error.message,
+        isLoading: false 
+      }, 'system');
+      throw error;
+    }
   }
 
-  // Cleanup method
   destroy() {
     this.broadcastChannel.close();
   }
 }
 
 export const meetService = new MeetService();
-
-// Clean up when the window unloads
-window.addEventListener('unload', () => {
-  meetService.destroy();
-});

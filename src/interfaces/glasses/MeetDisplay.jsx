@@ -1,23 +1,10 @@
 // src/interfaces/glasses/MeetDisplay.jsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useMeet } from '../../hooks/useMeet';
-import { Card } from '../../components/ui/card';
-import { Mic, Camera, Settings } from 'lucide-react';
+import { MeetingControls } from '../../components/MeetingControls';
 
 export function GlassesMeetDisplay() {
-  const { 
-    currentTime, 
-    isMuted, 
-    isVideoOff, 
-    currentMeeting,
-    deviceStates,
-    toggleMute, 
-    toggleVideo 
-  } = useMeet();
-
-  // Always pass the source of the action
-  const handleToggleMute = () => toggleMute('glasses');
-  const handleToggleVideo = () => toggleVideo('glasses');
+  const { currentMeeting, currentTime, deviceStates } = useMeet();
 
   return (
     <div className="fixed inset-0 bg-black/90 text-white">
@@ -30,23 +17,24 @@ export function GlassesMeetDisplay() {
         ))}
       </div>
 
-      {/* Rest of your component */}
-      
-      <Card className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800/50 backdrop-blur">
-        <div className="flex items-center space-x-4 p-2">
-          <button onClick={handleToggleMute} 
-                  className={`p-2 rounded-full ${isMuted ? 'bg-red-500' : 'bg-slate-700'}`}>
-            <Mic className="w-5 h-5" />
-          </button>
-          <button onClick={handleToggleVideo}
-                  className={`p-2 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-slate-700'}`}>
-            <Camera className="w-5 h-5" />
-          </button>
-          <button className="p-2 rounded-full bg-slate-700">
-            <Settings className="w-5 h-5" />
-          </button>
+      <div className="h-full flex flex-col items-center justify-center">
+        {currentMeeting ? (
+          <div className="text-center mb-8">
+            <h2 className="text-xl font-semibold">{currentMeeting.title}</h2>
+            <p className="text-sm opacity-80">
+              {new Date(currentMeeting.startTime).toLocaleString()}
+            </p>
+          </div>
+        ) : (
+          <div className="text-center mb-8 opacity-50">
+            <p>No active meeting</p>
+          </div>
+        )}
+
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 w-full max-w-md">
+          <MeetingControls interfaceType="glasses" />
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

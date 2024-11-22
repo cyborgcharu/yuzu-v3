@@ -1,6 +1,6 @@
 // src/components/MeetProvider.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { meetService } from '../services/meetService';
+import { meetService } from '../services/meetService';  // Use named import
 
 const MeetContext = createContext(null);
 
@@ -8,18 +8,15 @@ export function MeetProvider({ children }) {
   const [meetState, setMeetState] = useState(meetService.state);
   
   useEffect(() => {
-    // Subscribe to state changes
     const unsubscribe = meetService.subscribe(state => {
       setMeetState(state);
       console.log('Meet state updated:', state);
     });
 
-    // Connect the current interface based on the route
     const path = window.location.pathname;
     const interfaceType = path.split('/')[1] || 'web';
     meetService.connectDevice(interfaceType);
 
-    // Handle tab visibility
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         meetService.connectDevice(interfaceType);
@@ -30,7 +27,6 @@ export function MeetProvider({ children }) {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Cleanup
     return () => {
       unsubscribe();
       meetService.disconnectDevice(interfaceType);
@@ -44,8 +40,8 @@ export function MeetProvider({ children }) {
     toggleVideo: (source) => meetService.toggleVideo(source),
     connectDevice: (deviceType) => meetService.connectDevice(deviceType),
     disconnectDevice: (deviceType) => meetService.disconnectDevice(deviceType),
-    setCurrentMeeting: (meeting) => meetService.setCurrentMeeting(meeting),
-    updateParticipants: (participants) => meetService.updateParticipants(participants)
+    createMeeting: (details) => meetService.createMeeting(details),
+    fetchUpcomingMeetings: () => meetService.fetchUpcomingMeetings()
   };
 
   return (
