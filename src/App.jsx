@@ -52,26 +52,38 @@ function LoadingSpinner() {
 
 // Auth Callback Handler
 function AuthCallback() {
- const { isAuthenticated } = useAuth();
- const [searchParams] = useSearchParams();
- const navigate = useNavigate();
+  const { setUser, setIsAuthenticated } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
- useEffect(() => {
-   console.log('Auth callback - params:', Object.fromEntries(searchParams.entries()));
-   if (searchParams.get('auth') === 'success') {
-     console.log('Auth successful, navigating to /glasses');
-     navigate('/glasses', { replace: true });
-   } else {
-     console.log('No success parameter, staying on callback page');
-   }
- }, [searchParams, navigate]);
+  useEffect(() => {
+    const sessionId = searchParams.get('sessionId');
+    if (sessionId) {
+      console.log('Auth successful, setting user and authentication state');
+      // Fetch the user and token information from the session
+      fetch(`/auth/user?sessionId=${sessionId}`, { credentials: 'include' })
+        .then((response) => response.json())
+        .then((data) => {
+          setUser(data.user);
+          setIsAuthenticated(true);
+          navigate('/glasses', { replace: true });
+        })
+        .catch((error) => {
+          console.error('Error fetching user data:', error);
+          navigate('/', { replace: true });
+        });
+    } else {
+      console.log('Auth failed, redirecting to home');
+      navigate('/', { replace: true });
+    }
+  }, [searchParams, navigate, setUser, setIsAuthenticated]);
 
- return (
-   <div className="flex flex-col items-center justify-center h-screen">
-     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
-     <p className="mt-4">Processing authentication...</p>
-   </div>
- );
+  return (
+    <div className="flex flex-col items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      <p className="mt-4">Processing authentication...</p>
+    </div>
+  );
 }
 
 // Protected Route Component

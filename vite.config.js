@@ -22,6 +22,20 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-    },
+      'buffer': 'buffer/',
+      'stream': 'stream-browserify',
+      'util': 'util/'
+    }
+  },
+  define: {
+    'global': {},
+    'process.env': {}
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
   }
 });

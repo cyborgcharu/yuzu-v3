@@ -3,12 +3,13 @@ import express from 'express';
 import session from 'express-session';
 import cors from 'cors';
 import { google } from 'googleapis';
-import { googleAuthService } from '../services/googleAuthService.js';
+import GoogleAuthService from '../server/GoogleAuthService.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const app = express();
+const googleAuthService = new GoogleAuthService();
 
 // Constants
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8080';
@@ -60,11 +61,9 @@ if (isDevelopment) {
 }
 
 // Auth routes
-app.get('/auth/google', (req, res) => {
- console.log('Starting Google auth flow');
- const authUrl = googleAuthService.generateAuthUrl();
- console.log('Redirecting to:', authUrl);
- res.redirect(authUrl);
+app.get('/auth/google', async (req, res) => {
+  const authUrl = await googleAuthService.generateAuthUrl(req.session.id);
+  res.redirect(authUrl);
 });
 
 app.get('/auth/callback', async (req, res) => {

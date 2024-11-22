@@ -1,26 +1,15 @@
-// src/services/authService.js
+// src/services/AuthService.js
 class AuthService {
-  constructor() {
-    this.googleAuth = new GoogleAuthService();
+  async startAuth() {
+    window.location.href = '/auth/google';
   }
-
-  async startAuth(req, res) {
-    const authUrl = this.googleAuth.generateAuthUrl();
-    res.redirect(authUrl);
-  }
-
-  async handleCallback(req, res) {
-    const { code } = req.query;
-    const tokens = await this.googleAuth.getTokens(code);
-    const userInfo = await this.googleAuth.getUserInfo(tokens);
-    
-    req.session.user = userInfo;
-    req.session.tokens = tokens;
-    
-    res.redirect('/dashboard'); // Direct to frontend route
-  }
-
-  async getUser(req) {
-    return req.session.user || null;
+  
+  async checkAuthStatus() {
+    const response = await fetch('/auth/status', {
+      credentials: 'include'
+    });
+    return response.json();
   }
 }
+
+export default AuthService;
