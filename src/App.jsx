@@ -136,14 +136,9 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/auth/success" element={<AuthSuccess />} />
               <Route path="/auth/failure" element={<AuthFailure />} />
-              <Route 
-                path="/glasses" 
-                element={
-                  <ProtectedRoute>
-                    <GlassesMeetDisplay />
-                  </ProtectedRoute>
-                } 
-              />
+              <Route path="/glasses" element={<GlassesMeetDisplay />} />
+              <Route path="/wrist" element={<WristMeetDisplay />} />
+              <Route path="/ring" element={<RingMeetDisplay />} />
               {/* ... other routes ... */}
             </Routes>
           </main>
