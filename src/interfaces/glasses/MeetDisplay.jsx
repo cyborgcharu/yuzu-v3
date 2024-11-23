@@ -4,6 +4,7 @@ import { useMeet } from '../../hooks/useMeet';
 import { Card } from '../../components/ui/card';
 import { Mic, Camera, Settings } from 'lucide-react';
 import { StatusIndicators } from '../../components/StatusIndicators';
+import { VideoFeed } from '../../components/VideoFeed';
 
 export function GlassesMeetDisplay() {
   const { 
@@ -17,11 +18,12 @@ export function GlassesMeetDisplay() {
   useEffect(() => {
     console.log('GlassesMeetDisplay mounted');
     connectDevice('glasses');
-  }, []);
+  }, [connectDevice]);
 
   return (
     <>
       <StatusIndicators />
+      <VideoFeed />
       <Card className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800/50 backdrop-blur">
         <div className="flex items-center space-x-4 p-2">
           <button 
