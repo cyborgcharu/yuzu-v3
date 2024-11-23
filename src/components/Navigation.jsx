@@ -2,6 +2,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import LoginButton from './LoginButton';
 
 const Navigation = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -28,13 +29,14 @@ const Navigation = () => {
                 <span className="text-sm">{user?.name}</span>
                 <button 
                   onClick={logout}
-                  className="text-sm hover:text-slate-300"
+                  className="text-sm hover:text-slate-300 px-3 py-1 rounded"
                 >
                   Logout
                 </button>
               </div>
             </>
           )}
+          {!isAuthenticated && <LoginButton />}
         </div>
       </div>
     </nav>

@@ -12,7 +12,9 @@ const AuthSuccess = () => {
       try {
         console.log('Starting auth check...');
         await checkAuth();
-        console.log('Auth check completed, redirecting...');
+        console.log('Auth check completed');
+        // Use window.history to properly handle SPA navigation
+        window.history.replaceState({}, '', '/glasses');
         navigate('/glasses', { replace: true });
       } catch (error) {
         console.error('Auth completion failed:', error);

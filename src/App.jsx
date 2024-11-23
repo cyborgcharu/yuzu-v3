@@ -17,6 +17,7 @@ import { RingMeetDisplay } from './interfaces/ring/MeetDisplay';
 import AuthSuccess from './components/AuthSuccess';
 
 
+
 function Navigation() {
   const { user, isAuthenticated, logout } = useAuth();
   
@@ -130,7 +131,7 @@ function App() {
         <div className="min-h-screen bg-gray-100 flex flex-col">
           <Navigation />
           <StatusIndicators />
-          <main className="flex-1">
+          <main className="flex-1 pt-16">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/auth/success" element={<AuthSuccess />} />
@@ -143,23 +144,7 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
-              <Route 
-                path="/wrist" 
-                element={
-                  <ProtectedRoute>
-                    <WristMeetDisplay />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/ring" 
-                element={
-                  <ProtectedRoute>
-                    <RingMeetDisplay />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {/* ... other routes ... */}
             </Routes>
           </main>
         </div>

@@ -63,11 +63,8 @@ app.use(session({
 // 4. Logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('Session:', {
-    id: req.sessionID,
-    hasSession: !!req.session,
-    hasUser: !!req.session?.user
-  });
+  console.log('Request headers:', req.headers);
+  console.log('Request body:', req.body);
   next();
 });
 
@@ -100,12 +97,15 @@ app.get('/auth/callback', async (req, res) => {
       return res.redirect(`${FRONTEND_URL}/auth/failure?error=no_code`);
     }
 
+    // Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
+    // Get user information
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     const userInfo = await oauth2.userinfo.get();
 
+    // Save user data and tokens in session
     req.session.tokens = tokens;
     req.session.user = {
       id: userInfo.data.id,
@@ -114,6 +114,7 @@ app.get('/auth/callback', async (req, res) => {
       picture: userInfo.data.picture
     };
 
+    // Save session explicitly
     await new Promise((resolve, reject) => {
       req.session.save(err => {
         if (err) {
@@ -126,11 +127,11 @@ app.get('/auth/callback', async (req, res) => {
       });
     });
 
-    // Redirect to frontend success route
-    res.redirect(`${FRONTEND_URL}/auth/success`);
+    // Redirect to frontend with hash to prevent query params being visible
+    res.redirect(`${FRONTEND_URL}/#/auth/success`);
   } catch (error) {
     console.error('Auth callback error:', error);
-    res.redirect(`${FRONTEND_URL}/auth/failure?error=${encodeURIComponent(error.message)}`);
+    res.redirect(`${FRONTEND_URL}/#/auth/failure?error=${encodeURIComponent(error.message)}`);
   }
 });
 
@@ -142,13 +143,10 @@ app.get('/auth/success', (req, res) => {
     });
   }
 
-  res.json({
-    success: true,
-    user: req.session.user
-  });
+  res.json(req.session.user);  // Just return the user data
 });
 
-// Add failure route handler
+
 app.get('/auth/failure', (req, res) => {
   const error = req.query.error || 'Unknown error';
   res.json({
@@ -157,7 +155,6 @@ app.get('/auth/failure', (req, res) => {
   });
 });
 
-// Update the user route to handle session checks
 app.get('/auth/user', (req, res) => {
   console.log('Session in /auth/user:', req.session);
   
@@ -183,9 +180,13 @@ app.post('/auth/logout', (req, res) => {
 });
 
 // Google Meet API Routes
-app.post('/api/meetings/create', async (req, res) => {
+app.post('/meetings/create', async (req, res) => {
+  console.log('Received meeting creation request');
+  console.log('Session:', req.session);
+  console.log('Tokens:', req.session?.tokens);
+
   if (!req.session?.tokens) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Unauthorized', message: 'No valid session' });
   }
 
   try {
@@ -193,7 +194,7 @@ app.post('/api/meetings/create', async (req, res) => {
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
     const event = {
-      summary: req.body.title || 'New Meeting',
+      summary: req.body.title || 'Yuzu Meet',
       start: {
         dateTime: req.body.startTime || new Date().toISOString(),
         timeZone: 'UTC',
@@ -210,11 +211,15 @@ app.post('/api/meetings/create', async (req, res) => {
       }
     };
 
+    console.log('Creating calendar event:', event);
     const response = await calendar.events.insert({
       calendarId: 'primary',
       conferenceDataVersion: 1,
       requestBody: event
     });
+
+    console.log('Calendar response:', response.data);
+
 
     res.json({
       meetingId: response.data.id,
@@ -224,13 +229,19 @@ app.post('/api/meetings/create', async (req, res) => {
     });
   } catch (error) {
     console.error('Create meeting error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: 'Failed to create meeting', 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
   }
 });
 
+
+
 app.post('/api/meetings/:meetingId/join', async (req, res) => {
   if (!req.session?.tokens) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Unauthorized', message: 'No valid session' });
   }
 
   try {
@@ -243,13 +254,35 @@ app.post('/api/meetings/:meetingId/join', async (req, res) => {
     });
 
     res.json({
+      meetingId: event.data.id,
       meetingUrl: event.data.hangoutLink,
       startTime: event.data.start.dateTime,
       endTime: event.data.end.dateTime
     });
   } catch (error) {
     console.error('Join meeting error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to join meeting', message: error.message });
+  }
+});
+
+app.post('/api/meetings/:meetingId/end', async (req, res) => {
+  if (!req.session?.tokens) {
+    return res.status(401).json({ error: 'Unauthorized', message: 'No valid session' });
+  }
+
+  try {
+    oauth2Client.setCredentials(req.session.tokens);
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    await calendar.events.delete({
+      calendarId: 'primary',
+      eventId: req.params.meetingId
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('End meeting error:', error);
+    res.status(500).json({ error: 'Failed to end meeting', message: error.message });
   }
 });
 

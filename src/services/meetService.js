@@ -44,6 +44,24 @@ class MeetService {
     }
   }
 
+  async endMeeting(meetingId) {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/meetings/${meetingId}/end`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to end meeting');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error ending meeting:', error);
+      throw error;
+    }
+  }
+
   async getAuthUrl() {
     try {
       const response = await fetch(`${this.baseUrl}/auth/google/url`, {
