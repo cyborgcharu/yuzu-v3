@@ -1,10 +1,12 @@
 // src/services/meetService.js
-import { google } from 'googleapis';
+class MeetService {
+  constructor() {
+    this.baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+  }
 
-export const meetService = {
   async createMeeting(params = {}) {
     try {
-      const response = await fetch('/api/meetings/create', {
+      const response = await fetch(`${this.baseUrl}/meetings/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -22,11 +24,11 @@ export const meetService = {
       console.error('Error creating meeting:', error);
       throw error;
     }
-  },
+  }
 
   async joinMeeting(meetingId) {
     try {
-      const response = await fetch(`/api/meetings/${meetingId}/join`, {
+      const response = await fetch(`${this.baseUrl}/meetings/${meetingId}/join`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -40,21 +42,26 @@ export const meetService = {
       console.error('Error joining meeting:', error);
       throw error;
     }
-  },
-
-  getAuthUrl() {
-    const oauth2Client = new google.auth.OAuth2(
-      import.meta.env.VITE_GOOGLE_CLIENT_ID,
-      import.meta.env.VITE_GOOGLE_CLIENT_SECRET,
-      import.meta.env.VITE_GOOGLE_REDIRECT_URI
-    );
-
-    return oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: [
-        'https://www.googleapis.com/auth/calendar',
-        'https://www.googleapis.com/auth/calendar.events'
-      ]
-    });
   }
-};
+
+  async getAuthUrl() {
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/google/url`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to get auth URL');
+      }
+      
+      const data = await response.json();
+      return data.url;
+    } catch (error) {
+      console.error('Error getting auth URL:', error);
+      throw error;
+    }
+  }
+}
+
+// Export a single instance of the service
+export const googleMeetService = new MeetService();

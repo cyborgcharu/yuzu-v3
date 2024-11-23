@@ -14,6 +14,8 @@ import { StatusIndicators } from './components/StatusIndicators';
 import { GlassesMeetDisplay } from './interfaces/glasses/MeetDisplay';
 import { WristMeetDisplay } from './interfaces/wrist/MeetDisplay';
 import { RingMeetDisplay } from './interfaces/ring/MeetDisplay';
+import AuthSuccess from './components/AuthSuccess';
+
 
 function Navigation() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -131,7 +133,7 @@ function App() {
           <main className="flex-1">
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/auth/success" element={<SuccessPage />} />
+              <Route path="/auth/success" element={<AuthSuccess />} />
               <Route path="/auth/failure" element={<AuthFailure />} />
               <Route 
                 path="/glasses" 

@@ -1,18 +1,22 @@
 // src/components/LoginButton.jsx
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-export default function LoginButton() {
-  const handleLogin = () => {
-    window.location.href = '/auth/google';
-  };
+const LoginButton = () => {
+  const { login, isAuthenticated } = useAuth();
+
+  if (isAuthenticated) {
+    return null;
+  }
 
   return (
     <button
-      onClick={handleLogin}
-      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
+      onClick={login}
+      className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
     >
-      Login with Google
+      Sign in with Google
     </button>
   );
-}
+};
+
+export default LoginButton;

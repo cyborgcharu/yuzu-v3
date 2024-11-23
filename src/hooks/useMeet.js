@@ -1,30 +1,27 @@
 // src/hooks/useMeet.js
-import { useState, useEffect } from 'react';
-import { meetService } from '../services/meetService';
-import { useAuth } from '../context/AuthContext';
+import { useState, useCallback } from 'react';
+import { googleMeetService } from '../services/meetService';
 
-export function useMeet() {
-  const { isAuthenticated } = useAuth();
-  const [meetState, setMeetState] = useState(meetService.state);
+export const useMeet = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const unsubscribe = meetService.subscribe(state => {
-      setMeetState(state);
-      console.log('Meet state updated:', state);
-    });
-
-    return () => unsubscribe();
-  }, [isAuthenticated]);
+  const createMeeting = useCallback(async (params) => {
+    setLoading(true);
+    try {
+      const result = await googleMeetService.createMeeting(params);
+      return result;
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return {
-    ...meetState,
-    toggleMute: (source) => meetService.toggleMute(source),
-    toggleVideo: (source) => meetService.toggleVideo(source),
-    connectDevice: (deviceType) => meetService.connectDevice(deviceType),
-    disconnectDevice: (deviceType) => meetService.disconnectDevice(deviceType),
-    createMeeting: (details) => meetService.createMeeting(details),
-    fetchUpcomingMeetings: () => meetService.fetchUpcomingMeetings()
+    createMeeting,
+    loading,
+    error
   };
-}
+};

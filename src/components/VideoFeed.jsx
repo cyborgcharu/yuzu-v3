@@ -1,12 +1,12 @@
 // src/components/VideoFeed.jsx
 import React, { useEffect } from 'react';
-import meetService from '../services/meetService';
+import { googleMeetService } from '../services/meetService';
 
-const VideoFeed = () => {
+export const VideoFeed = () => {  // Changed to named export (export const)
   useEffect(() => {
     const joinMeeting = async () => {
       try {
-        const meetingDetails = await meetService.joinMeeting('your-meeting-id');
+        const meetingDetails = await googleMeetService.joinMeeting('your-meeting-id');
         console.log('Joined meeting:', meetingDetails);
         // Handle the meeting connection here
       } catch (error) {
@@ -23,5 +23,3 @@ const VideoFeed = () => {
     </div>
   );
 };
-
-export default VideoFeed;

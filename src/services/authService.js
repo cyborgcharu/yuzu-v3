@@ -1,36 +1,62 @@
-// src/services/AuthService.js
+// src/services/authService.js
 class AuthService {
-  startAuth() {
-    window.location.href = '/auth/google';
+  constructor() {
+    this.baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
   }
 
   async getUser() {
-    const response = await fetch('/auth/user', {
-      credentials: 'include',
-      headers: {
-        'Accept': 'application/json'
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/user`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        }
+      });
+
+      // If unauthorized, return null instead of throwing
+      if (response.status === 401) {
+        return null;
       }
-    });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch user: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Failed to get user: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting user:', error);
+      return null;
     }
+  }
 
-    return response.json();
+  login() {
+    // Redirect to Google OAuth
+    window.location.href = `${this.baseUrl}/auth/google`;
   }
 
   async logout() {
-    const response = await fetch('/auth/logout', {
-      method: 'POST',
-      credentials: 'include'
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
 
-    if (!response.ok) {
-      throw new Error('Logout failed');
+      if (!response.ok) {
+        throw new Error('Failed to logout');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error logging out:', error);
+      throw error;
     }
-
-    return response.json();
   }
 }
 
-export default AuthService;
+export const authService = new AuthService();
