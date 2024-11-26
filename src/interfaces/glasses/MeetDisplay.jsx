@@ -1,96 +1,93 @@
 // src/interfaces/glasses/MeetDisplay.jsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useContext } from 'react';
 import { Card } from '@/components/ui/card';
-import { Mic, Camera, Settings, Video, PhoneOff } from 'lucide-react';
+import { Mic, Camera, Settings, PhoneOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { googleMeetService } from '@/services/meetService';
+import { MeetContext } from '@/context/MeetContext';
+import { useNavigate } from 'react-router-dom';
 
 export const GlassesMeetDisplay = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const videoRef = useRef(null);
-  const [stream, setStream] = useState(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [meetingDetails, setMeetingDetails] = useState(null);
-  const [error, setError] = useState(null);
+  const { 
+    currentMeeting,
+    isMuted,
+    isVideoOff,
+    error,
+    createMeeting,
+    endMeeting,
+    toggleMute,
+    toggleVideo
+  } = useContext(MeetContext);
 
   useEffect(() => {
+    let mounted = true;
+    let localStream = null;
+
     const initializeMeeting = async () => {
       try {
-        // First create or join a meeting
-        const meetDetails = await googleMeetService.createMeeting({
+        await createMeeting({
           title: `Yuzu Glass Meeting - ${user?.name}`,
           startTime: new Date().toISOString(),
-          endTime: new Date(Date.now() + 3600000).toISOString() // 1 hour from now
+          endTime: new Date(Date.now() + 3600000).toISOString()
         });
 
-        console.log('Meeting created:', meetDetails);
-        setMeetingDetails(meetDetails);
-
-        // Then get local media stream
         const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true
         });
 
+        if (!mounted) {
+          mediaStream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
         }
-        setStream(mediaStream);
-      } catch (error) {
-        console.error('Failed to initialize meeting:', error);
-        setError(error.message);
+        localStream = mediaStream;
+      } catch (err) {
+        console.error('Failed to initialize meeting:', err);
       }
     };
 
     initializeMeeting();
 
     return () => {
-      // Cleanup
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+      mounted = false;
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [user]);
+  }, [user, createMeeting]);
 
-  const toggleMute = () => {
-    if (stream) {
-      const audioTrack = stream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
-      }
-    }
+  const handleToggleMute = (e) => {
+    e.preventDefault();
+    toggleMute('glasses');
   };
 
-  const toggleVideo = () => {
-    if (stream) {
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
-      }
-    }
+  const handleToggleVideo = (e) => {
+    e.preventDefault();
+    toggleVideo('glasses');
   };
 
-  const endCall = async () => {
+  const handleEndCall = async (e) => {
+    e.preventDefault();
     try {
-      if (meetingDetails?.meetingId) {
-        await googleMeetService.endMeeting(meetingDetails.meetingId);
+      await endMeeting();
+      if (videoRef.current?.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
       }
-      // Stop local media tracks
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      // Redirect or handle meeting end
-    } catch (error) {
-      console.error('Failed to end meeting:', error);
+      navigate('/');
+    } catch (err) {
+      console.error('Failed to end meeting:', err);
     }
   };
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <div className="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center p-4">
         <p className="text-red-500 mb-4">Error: {error}</p>
         <button 
           onClick={() => window.location.reload()} 
@@ -103,24 +100,9 @@ export const GlassesMeetDisplay = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-900">
-      {/* Meeting Info */}
-      {meetingDetails && (
-        <div className="fixed top-4 right-4 bg-slate-800/80 backdrop-blur-sm rounded-lg p-2 text-white">
-          <p className="text-sm">Meeting ID: {meetingDetails.meetingId}</p>
-          <a 
-            href={meetingDetails.meetingUrl} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-sm text-blue-400 hover:text-blue-300"
-          >
-            Join on web →
-          </a>
-        </div>
-      )}
-
+    <div className="fixed inset-0 bg-slate-900">
       {/* Main Video Feed */}
-      <div className="flex-1 relative">
+      <div className="absolute inset-0">
         <video
           ref={videoRef}
           autoPlay
@@ -140,38 +122,52 @@ export const GlassesMeetDisplay = () => {
         )}
       </div>
 
+      {/* Meeting Info - Added top padding to account for nav bar */}
+      {currentMeeting && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-sm rounded-lg p-3 text-center z-50">
+          <p className="text-sm text-white">
+            Meeting ID: {currentMeeting.meetingId}
+          </p>
+          <a 
+            href={currentMeeting.meetingUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-sm text-blue-400 hover:text-blue-300 inline-block mt-1"
+          >
+            Join on web →
+          </a>
+        </div>
+      )}
+
       {/* Controls */}
-      <Card className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800/50 backdrop-blur">
-        <div className="flex items-center space-x-4 p-2">
-          <button
-            onClick={toggleMute}
-            className={`p-3 rounded-full transition-colors ${
+      <Card className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-sm rounded-lg">
+        <div className="flex items-center space-x-4 p-4">
+          <button 
+            onClick={handleToggleMute}
+            className={`p-4 rounded-full transition-colors ${
               isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-700 hover:bg-slate-600'
             }`}
           >
-            <Mic className="w-5 h-5 text-white" />
+            <Mic className="w-6 h-6 text-white" />
           </button>
-          
-          <button
-            onClick={toggleVideo}
-            className={`p-3 rounded-full transition-colors ${
+          <button 
+            onClick={handleToggleVideo}
+            className={`p-4 rounded-full transition-colors ${
               isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-700 hover:bg-slate-600'
             }`}
           >
-            <Camera className="w-5 h-5 text-white" />
+            <Camera className="w-6 h-6 text-white" />
           </button>
-          
-          <button
-            onClick={endCall}
-            className="p-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
+          <button 
+            onClick={handleEndCall}
+            className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
           >
-            <PhoneOff className="w-5 h-5 text-white" />
+            <PhoneOff className="w-6 h-6 text-white" />
           </button>
-          
-          <button
-            className="p-3 rounded-full bg-slate-700 hover:bg-slate-600 transition-colors"
+          <button 
+            className="p-4 rounded-full bg-slate-700 hover:bg-slate-600 transition-colors"
           >
-            <Settings className="w-5 h-5 text-white" />
+            <Settings className="w-6 h-6 text-white" />
           </button>
         </div>
       </Card>
