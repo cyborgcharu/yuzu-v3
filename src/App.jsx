@@ -9,14 +9,13 @@ import {
   useNavigate 
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { MeetProvider } from './context/MeetContext';
 import LoginButton from '@/components/LoginButton';
 import { StatusIndicators } from './components/StatusIndicators';
 import { GlassesMeetDisplay } from './interfaces/glasses/MeetDisplay';
 import { WristMeetDisplay } from './interfaces/wrist/MeetDisplay';
 import { RingMeetDisplay } from './interfaces/ring/MeetDisplay';
 import AuthSuccess from './components/AuthSuccess';
-
-
 
 function Navigation() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -124,6 +123,21 @@ function ProtectedRoute({ children }) {
   return isAuthenticated ? children : null;
 }
 
+// Wrapper component for meet interfaces
+function MeetInterface({ children }) {
+  const { isAuthenticated } = useAuth();
+  
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return (
+    <MeetProvider>
+      {children}
+    </MeetProvider>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -136,10 +150,36 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/auth/success" element={<AuthSuccess />} />
               <Route path="/auth/failure" element={<AuthFailure />} />
-              <Route path="/glasses" element={<GlassesMeetDisplay />} />
-              <Route path="/wrist" element={<WristMeetDisplay />} />
-              <Route path="/ring" element={<RingMeetDisplay />} />
-              {/* ... other routes ... */}
+              <Route 
+                path="/glasses" 
+                element={
+                  <ProtectedRoute>
+                    <MeetInterface>
+                      <GlassesMeetDisplay />
+                    </MeetInterface>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/wrist" 
+                element={
+                  <ProtectedRoute>
+                    <MeetInterface>
+                      <WristMeetDisplay />
+                    </MeetInterface>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/ring" 
+                element={
+                  <ProtectedRoute>
+                    <MeetInterface>
+                      <RingMeetDisplay />
+                    </MeetInterface>
+                  </ProtectedRoute>
+                } 
+              />
             </Routes>
           </main>
         </div>
