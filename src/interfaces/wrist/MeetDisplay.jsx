@@ -22,24 +22,26 @@ export const WristMeetDisplay = () => {
     toggleVideo
   } = useContext(MeetContext);
 
+  const deviceType = window.location.pathname.split('/')[1] || 'web'; // 'glasses' or 'wrist'
+
+
   useEffect(() => {
     let mounted = true;
 
     const initializeMeeting = async () => {
       try {
-        // Only create a meeting if one doesn't exist
         if (!currentMeeting) {
           await createMeeting({
-            title: `Yuzu Glass Meeting - ${user?.name}`,
+            title: `Yuzu ${deviceType} Meeting - ${user?.name}`,
             startTime: new Date().toISOString(),
             endTime: new Date(Date.now() + 3600000).toISOString()
           });
         }
-
+    
         const mediaStream = await googleMeetService.initializeMediaStream();
         
         if (!mounted) return;
-
+    
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
         }
@@ -53,16 +55,16 @@ export const WristMeetDisplay = () => {
     return () => {
       mounted = false;
     };
-  }, [user?.name]);
+  }, [user?.name, deviceType, currentMeeting, createMeeting]);
 
   const handleToggleMute = (e) => {
     e.preventDefault();
-    toggleMute();
+    toggleMute(deviceType);
   };
 
   const handleToggleVideo = (e) => {
     e.preventDefault();
-    toggleVideo();
+    toggleVideo(deviceType);
   };
 
   const handleEndCall = async (e) => {

@@ -3,8 +3,8 @@ class MeetService {
   constructor() {
     this.state = {
       currentMeeting: null,
-      isMuted: false,
-      isVideoOff: false,
+      isMuted: JSON.parse(localStorage.getItem('isMuted') || 'false'),
+      isVideoOff: JSON.parse(localStorage.getItem('isVideoOff') || 'false'),
       participants: [],
       connectedDevices: new Set()
     };
@@ -15,7 +15,15 @@ class MeetService {
 
   createMeeting = async (params) => {
     try {
-      // You might want to add your actual API call here
+      // Check if there's already an active meeting across interfaces
+      const existingMeeting = localStorage.getItem('currentMeeting');
+      if (existingMeeting) {
+        const meeting = JSON.parse(existingMeeting);
+        this.updateState({ currentMeeting: meeting });
+        return meeting;
+      }
+  
+      // If no existing meeting, create a new one
       const meeting = {
         meetingId: `meeting-${Date.now()}`,
         title: params.title,
@@ -25,6 +33,7 @@ class MeetService {
       };
       
       this.updateState({ currentMeeting: meeting });
+      localStorage.setItem('currentMeeting', JSON.stringify(meeting));
       return meeting;
     } catch (error) {
       console.error('Error creating meeting:', error);
@@ -40,8 +49,13 @@ class MeetService {
   };
 
   updateState = (newState) => {
+    console.log('Previous state:', this.state);
     this.state = { ...this.state, ...newState };
-    this.subscribers.forEach(callback => callback(this.state));
+    console.log('New state:', this.state);
+    this.subscribers.forEach(callback => {
+      console.log('Notifying subscriber with state:', this.state);
+      callback(this.state);
+    });
   };
 
   connectDevice = (deviceType) => {
@@ -73,17 +87,21 @@ class MeetService {
       
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
-        this.updateState({ isMuted: !audioTrack.enabled });
+        const isMuted = !audioTrack.enabled;
+        
+        // Save mute state to localStorage
+        localStorage.setItem('isMuted', JSON.stringify(isMuted));
+        this.updateState({ isMuted });
       }
       
-      console.log(`Mute toggled from ${source}:`, !audioTrack.enabled);
-      return !audioTrack.enabled;
+      console.log(`Mute toggled from ${source}:`, this.state.isMuted);
+      return this.state.isMuted;
     } catch (error) {
       console.error('Error toggling mute:', error);
       return this.state.isMuted;
     }
   };
-
+  
   toggleVideo = async (source) => {
     try {
       const stream = await this.initializeMediaStream();
@@ -91,11 +109,15 @@ class MeetService {
       
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
-        this.updateState({ isVideoOff: !videoTrack.enabled });
+        const isVideoOff = !videoTrack.enabled;
+        
+        // Save video state to localStorage
+        localStorage.setItem('isVideoOff', JSON.stringify(isVideoOff));
+        this.updateState({ isVideoOff });
       }
       
-      console.log(`Video toggled from ${source}:`, !videoTrack.enabled);
-      return !videoTrack.enabled;
+      console.log(`Video toggled from ${source}:`, this.state.isVideoOff);
+      return this.state.isVideoOff;
     } catch (error) {
       console.error('Error toggling video:', error);
       return this.state.isVideoOff;
@@ -117,6 +139,7 @@ class MeetService {
     }
     this.subscribers.clear();
     this.state.connectedDevices.clear();
+    localStorage.removeItem('currentMeeting');
     this.updateState({
       currentMeeting: null,
       isMuted: false,

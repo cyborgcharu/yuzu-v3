@@ -1,11 +1,17 @@
-// src/context/MeetContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { googleMeetService } from '../services/meetService';
 
 export const MeetContext = createContext(null);
 
 export function MeetProvider({ children }) {
-  const [meetState, setMeetState] = useState(googleMeetService.state);
+  const [meetState, setMeetState] = useState(() => {
+    // Check localStorage for existing meeting
+    const savedMeeting = localStorage.getItem('currentMeeting');
+    if (savedMeeting) {
+      googleMeetService.state.currentMeeting = JSON.parse(savedMeeting);
+    }
+    return googleMeetService.state;
+  });
 
   useEffect(() => {
     const unsubscribe = googleMeetService.subscribe(state => {
@@ -33,6 +39,13 @@ export function MeetProvider({ children }) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
+
+  // Save meeting to localStorage when it changes
+  useEffect(() => {
+    if (meetState.currentMeeting) {
+      localStorage.setItem('currentMeeting', JSON.stringify(meetState.currentMeeting));
+    }
+  }, [meetState.currentMeeting]);
 
   const value = React.useMemo(() => ({
     ...meetState,
