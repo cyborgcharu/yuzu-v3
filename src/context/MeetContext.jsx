@@ -1,122 +1,61 @@
-// src/context/MeetContext.js
-import React, { createContext, useReducer, useCallback } from 'react';
+// src/context/MeetContext.jsx
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { googleMeetService } from '../services/meetService';
 
-export const MeetContext = createContext();
+export const MeetContext = createContext(null);
 
-const ACTION_TYPES = {
-  SET_CURRENT_MEETING: 'SET_CURRENT_MEETING',
-  SET_MUTE_STATE: 'SET_MUTE_STATE',
-  SET_VIDEO_STATE: 'SET_VIDEO_STATE',
-  SET_LOADING_STATE: 'SET_LOADING_STATE',
-  SET_GOOGLE_AUTH_STATUS: 'SET_GOOGLE_AUTH_STATUS',
-  CLEAR_MEETING: 'CLEAR_MEETING',
-  SET_ERROR: 'SET_ERROR'
-};
+export function MeetProvider({ children }) {
+  const [meetState, setMeetState] = useState(googleMeetService.state);
 
-const meetReducer = (state, action) => {
-  switch (action.type) {
-    case ACTION_TYPES.SET_CURRENT_MEETING:
-      return { 
-        ...state, 
-        currentMeeting: action.payload,
-        error: null 
-      };
-    case ACTION_TYPES.SET_MUTE_STATE:
-      return { ...state, isMuted: action.payload };
-    case ACTION_TYPES.SET_VIDEO_STATE:
-      return { ...state, isVideoOff: action.payload };
-    case ACTION_TYPES.SET_LOADING_STATE:
-      return { ...state, isLoading: action.payload };
-    case ACTION_TYPES.SET_GOOGLE_AUTH_STATUS:
-      return { ...state, googleAuthStatus: action.payload };
-    case ACTION_TYPES.CLEAR_MEETING:
-      return { 
-        ...state, 
-        currentMeeting: null,
-        isMuted: false,
-        isVideoOff: false 
-      };
-    case ACTION_TYPES.SET_ERROR:
-      return { ...state, error: action.payload };
-    default:
-      return state;
-  }
-};
+  useEffect(() => {
+    const unsubscribe = googleMeetService.subscribe(state => {
+      setMeetState(state);
+      console.log('Meet state updated:', state);
+    });
 
-export const MeetProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(meetReducer, {
-    currentMeeting: null,
-    isMuted: false,
-    isVideoOff: false,
-    isLoading: false,
-    googleAuthStatus: 'checking',
-    error: null
-  });
+    const path = window.location.pathname;
+    const interfaceType = path.split('/')[1] || 'web';
+    googleMeetService.connectDevice(interfaceType);
 
-  const createMeeting = useCallback(async (meetingDetails) => {
-    try {
-      dispatch({ type: ACTION_TYPES.SET_LOADING_STATE, payload: true });
-      const newMeeting = await googleMeetService.createMeeting(meetingDetails);
-      dispatch({ type: ACTION_TYPES.SET_CURRENT_MEETING, payload: newMeeting });
-    } catch (error) {
-      dispatch({ type: ACTION_TYPES.SET_ERROR, payload: error.message });
-    } finally {
-      dispatch({ type: ACTION_TYPES.SET_LOADING_STATE, payload: false });
-    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        googleMeetService.connectDevice(interfaceType);
+      } else {
+        googleMeetService.disconnectDevice(interfaceType);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      unsubscribe();
+      googleMeetService.disconnectDevice(interfaceType);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
-  const endMeeting = useCallback(async () => {
-    try {
-      dispatch({ type: ACTION_TYPES.SET_LOADING_STATE, payload: true });
-      
-      if (state.currentMeeting?.meetingId) {
-        await googleMeetService.endMeeting(state.currentMeeting.meetingId);
-      }
-      
-      dispatch({ type: ACTION_TYPES.CLEAR_MEETING });
-    } catch (error) {
-      dispatch({ type: ACTION_TYPES.SET_ERROR, payload: error.message });
-    } finally {
-      dispatch({ type: ACTION_TYPES.SET_LOADING_STATE, payload: false });
-    }
-  }, [state.currentMeeting]);
-
-  const toggleMute = useCallback(async (interfaceType) => {
-    try {
-      await googleMeetService.toggleMute(interfaceType);
-      dispatch({ 
-        type: ACTION_TYPES.SET_MUTE_STATE, 
-        payload: !state.isMuted 
-      });
-    } catch (error) {
-      dispatch({ type: ACTION_TYPES.SET_ERROR, payload: error.message });
-    }
-  }, [state.isMuted]);
-
-  const toggleVideo = useCallback(async (interfaceType) => {
-    try {
-      await googleMeetService.toggleVideo(interfaceType);
-      dispatch({ 
-        type: ACTION_TYPES.SET_VIDEO_STATE, 
-        payload: !state.isVideoOff 
-      });
-    } catch (error) {
-      dispatch({ type: ACTION_TYPES.SET_ERROR, payload: error.message });
-    }
-  }, [state.isVideoOff]);
+  const value = React.useMemo(() => ({
+    ...meetState,
+    createMeeting: (params) => googleMeetService.createMeeting(params),
+    toggleMute: (source) => googleMeetService.toggleMute(source),
+    toggleVideo: (source) => googleMeetService.toggleVideo(source),
+    connectDevice: (deviceType) => googleMeetService.connectDevice(deviceType),
+    disconnectDevice: (deviceType) => googleMeetService.disconnectDevice(deviceType),
+    setCurrentMeeting: (meeting) => googleMeetService.setCurrentMeeting(meeting),
+    updateParticipants: (participants) => googleMeetService.updateParticipants(participants)
+  }), [meetState]);
 
   return (
-    <MeetContext.Provider
-      value={{
-        ...state,
-        createMeeting,
-        endMeeting,
-        toggleMute,
-        toggleVideo
-      }}
-    >
+    <MeetContext.Provider value={value}>
       {children}
     </MeetContext.Provider>
   );
-};
+}
+
+export function useMeet() {
+  const context = useContext(MeetContext);
+  if (!context) {
+    throw new Error('useMeet must be used within a MeetProvider');
+  }
+  return context;
+}

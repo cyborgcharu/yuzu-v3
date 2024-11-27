@@ -1,94 +1,61 @@
 // src/services/meetService.js
 class MeetService {
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+    this.state = {
+      currentMeeting: null,
+      isMuted: false,
+      isVideoOff: false,
+      participants: [],
+      connectedDevices: new Set()
+    };
+    
+    this.subscribers = new Set();
     this.mediaStream = null;
   }
 
-  // Existing API methods
-  async createMeeting(params = {}) {
+  createMeeting = async (params) => {
     try {
-      const response = await fetch(`${this.baseUrl}/meetings/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(params),
-        credentials: 'include'
-      });
+      // You might want to add your actual API call here
+      const meeting = {
+        meetingId: `meeting-${Date.now()}`,
+        title: params.title,
+        startTime: params.startTime,
+        endTime: params.endTime,
+        meetingUrl: `https://meet.google.com/${Date.now()}`
+      };
       
-      if (!response.ok) {
-        throw new Error('Failed to create meeting');
-      }
-      
-      return await response.json();
+      this.updateState({ currentMeeting: meeting });
+      return meeting;
     } catch (error) {
       console.error('Error creating meeting:', error);
       throw error;
     }
-  }
+  };
 
-  async joinMeeting(meetingId) {
-    try {
-      const response = await fetch(`${this.baseUrl}/meetings/${meetingId}/join`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to join meeting');
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error joining meeting:', error);
-      throw error;
-    }
-  }
 
-  async endMeeting(meetingId) {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/meetings/${meetingId}/end`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to end meeting');
-      }
-      
-      // Cleanup media stream when meeting ends
-      if (this.mediaStream) {
-        this.mediaStream.getTracks().forEach(track => track.stop());
-        this.mediaStream = null;
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error ending meeting:', error);
-      throw error;
-    }
-  }
+  subscribe = (callback) => {
+    this.subscribers.add(callback);
+    callback(this.state);
+    return () => this.subscribers.delete(callback);
+  };
 
-  async getAuthUrl() {
-    try {
-      const response = await fetch(`${this.baseUrl}/auth/google/url`, {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to get auth URL');
-      }
-      
-      const data = await response.json();
-      return data.url;
-    } catch (error) {
-      console.error('Error getting auth URL:', error);
-      throw error;
-    }
-  }
+  updateState = (newState) => {
+    this.state = { ...this.state, ...newState };
+    this.subscribers.forEach(callback => callback(this.state));
+  };
 
-  // New media control methods
+  connectDevice = (deviceType) => {
+    this.state.connectedDevices.add(deviceType);
+    this.updateState({ connectedDevices: this.state.connectedDevices });
+    console.log(`Device connected: ${deviceType}`);
+  };
+
+  disconnectDevice = (deviceType) => {
+    this.state.connectedDevices.delete(deviceType);
+    this.updateState({ connectedDevices: this.state.connectedDevices });
+    console.log(`Device disconnected: ${deviceType}`);
+  };
+
   async initializeMediaStream() {
     if (!this.mediaStream) {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -99,53 +66,66 @@ class MeetService {
     return this.mediaStream;
   }
 
-  async toggleMute(interfaceType) {
+  toggleMute = async (source) => {
     try {
       const stream = await this.initializeMediaStream();
       const audioTrack = stream.getAudioTracks()[0];
       
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
-        return !audioTrack.enabled; // Returns true if muted
+        this.updateState({ isMuted: !audioTrack.enabled });
       }
-      return false;
+      
+      console.log(`Mute toggled from ${source}:`, !audioTrack.enabled);
+      return !audioTrack.enabled;
     } catch (error) {
       console.error('Error toggling mute:', error);
-      throw new Error('Failed to toggle mute');
+      return this.state.isMuted;
     }
-  }
+  };
 
-  async toggleVideo(interfaceType) {
+  toggleVideo = async (source) => {
     try {
       const stream = await this.initializeMediaStream();
       const videoTrack = stream.getVideoTracks()[0];
       
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
-        return !videoTrack.enabled; // Returns true if video is off
+        this.updateState({ isVideoOff: !videoTrack.enabled });
       }
-      return false;
+      
+      console.log(`Video toggled from ${source}:`, !videoTrack.enabled);
+      return !videoTrack.enabled;
     } catch (error) {
       console.error('Error toggling video:', error);
-      throw new Error('Failed to toggle video');
+      return this.state.isVideoOff;
     }
-  }
+  };
 
-  getMediaStream() {
-    return this.mediaStream;
-  }
+  setCurrentMeeting = (meeting) => {
+    this.updateState({ currentMeeting: meeting });
+  };
 
-  setMediaStream(stream) {
-    this.mediaStream = stream;
-  }
+  updateParticipants = (participants) => {
+    this.updateState({ participants });
+  };
 
-  stopMediaStream() {
+  cleanup = () => {
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach(track => track.stop());
       this.mediaStream = null;
     }
-  }
+    this.subscribers.clear();
+    this.state.connectedDevices.clear();
+    this.updateState({
+      currentMeeting: null,
+      isMuted: false,
+      isVideoOff: false,
+      participants: []
+    });
+  };
 }
 
-// Export a single instance of the service
-export const googleMeetService = new MeetService();
+// Export both names to support existing imports
+export const meetService = new MeetService();
+export const googleMeetService = meetService;

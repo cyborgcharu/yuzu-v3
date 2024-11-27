@@ -5,6 +5,7 @@ import { Mic, Camera, Settings, PhoneOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { MeetContext } from '@/context/MeetContext';
 import { useNavigate } from 'react-router-dom';
+import { googleMeetService } from '@/services/meetService';
 
 export const WristMeetDisplay = () => {
   const { user } = useAuth();
@@ -23,32 +24,25 @@ export const WristMeetDisplay = () => {
 
   useEffect(() => {
     let mounted = true;
-    let localStream = null;
 
     const initializeMeeting = async () => {
       try {
-        // Create or join meeting through context
-        await createMeeting({
-          title: `Yuzu Wrist Meeting - ${user?.name}`,
-          startTime: new Date().toISOString(),
-          endTime: new Date(Date.now() + 3600000).toISOString()
-        });
-
-        // Get local media stream
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
-        });
-
-        if (!mounted) {
-          mediaStream.getTracks().forEach(track => track.stop());
-          return;
+        // Only create a meeting if one doesn't exist
+        if (!currentMeeting) {
+          await createMeeting({
+            title: `Yuzu Glass Meeting - ${user?.name}`,
+            startTime: new Date().toISOString(),
+            endTime: new Date(Date.now() + 3600000).toISOString()
+          });
         }
+
+        const mediaStream = await googleMeetService.initializeMediaStream();
+        
+        if (!mounted) return;
 
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
         }
-        localStream = mediaStream;
       } catch (err) {
         console.error('Failed to initialize meeting:', err);
       }
@@ -58,30 +52,25 @@ export const WristMeetDisplay = () => {
 
     return () => {
       mounted = false;
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
     };
-  }, [user, createMeeting]);
+  }, [user?.name]);
 
   const handleToggleMute = (e) => {
     e.preventDefault();
-    toggleMute('wrist');
+    toggleMute();
   };
 
   const handleToggleVideo = (e) => {
     e.preventDefault();
-    toggleVideo('wrist');
+    toggleVideo();
   };
 
   const handleEndCall = async (e) => {
     e.preventDefault();
     try {
       await endMeeting();
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      }
-      navigate('/'); // Redirect to home after ending call
+      googleMeetService.stopMediaStream();
+      navigate('/');
     } catch (err) {
       console.error('Failed to end meeting:', err);
     }

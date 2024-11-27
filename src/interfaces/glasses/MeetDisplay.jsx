@@ -5,6 +5,7 @@ import { Mic, Camera, Settings, PhoneOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { MeetContext } from '@/context/MeetContext';
 import { useNavigate } from 'react-router-dom';
+import { googleMeetService } from '@/services/meetService';
 
 export const GlassesMeetDisplay = () => {
   const { user } = useAuth();
@@ -23,30 +24,25 @@ export const GlassesMeetDisplay = () => {
 
   useEffect(() => {
     let mounted = true;
-    let localStream = null;
 
     const initializeMeeting = async () => {
       try {
-        await createMeeting({
-          title: `Yuzu Glass Meeting - ${user?.name}`,
-          startTime: new Date().toISOString(),
-          endTime: new Date(Date.now() + 3600000).toISOString()
-        });
-
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
-        });
-
-        if (!mounted) {
-          mediaStream.getTracks().forEach(track => track.stop());
-          return;
+        // Only create a meeting if one doesn't exist
+        if (!currentMeeting) {
+          await createMeeting({
+            title: `Yuzu Glass Meeting - ${user?.name}`,
+            startTime: new Date().toISOString(),
+            endTime: new Date(Date.now() + 3600000).toISOString()
+          });
         }
+
+        const mediaStream = await googleMeetService.initializeMediaStream();
+        
+        if (!mounted) return;
 
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
         }
-        localStream = mediaStream;
       } catch (err) {
         console.error('Failed to initialize meeting:', err);
       }
@@ -56,29 +52,24 @@ export const GlassesMeetDisplay = () => {
 
     return () => {
       mounted = false;
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
     };
-  }, [user, createMeeting]);
+  }, [user?.name]);
 
   const handleToggleMute = (e) => {
     e.preventDefault();
-    toggleMute('glasses');
+    toggleMute();
   };
 
   const handleToggleVideo = (e) => {
     e.preventDefault();
-    toggleVideo('glasses');
+    toggleVideo();
   };
 
   const handleEndCall = async (e) => {
     e.preventDefault();
     try {
       await endMeeting();
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      }
+      googleMeetService.stopMediaStream();
       navigate('/');
     } catch (err) {
       console.error('Failed to end meeting:', err);
@@ -122,7 +113,7 @@ export const GlassesMeetDisplay = () => {
         )}
       </div>
 
-      {/* Meeting Info - Added top padding to account for nav bar */}
+      {/* Meeting Info */}
       {currentMeeting && (
         <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-slate-800/90 backdrop-blur-sm rounded-lg p-3 text-center z-50">
           <p className="text-sm text-white">
