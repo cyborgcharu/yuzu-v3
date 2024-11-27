@@ -22,13 +22,13 @@ export const GlassesMeetDisplay = () => {
     toggleVideo
   } = useContext(MeetContext);
 
-  const deviceType = window.location.pathname.split('/')[1] || 'web'; // 'glasses' or 'wrist'
+  const deviceType = window.location.pathname.split('/')[1] || 'web';
 
-
+  // Initial meeting and media stream setup
   useEffect(() => {
     let mounted = true;
-
-    const initializeMeeting = async () => {
+  
+    const initializeMedia = async () => {
       try {
         if (!currentMeeting) {
           await createMeeting({
@@ -39,32 +39,32 @@ export const GlassesMeetDisplay = () => {
         }
     
         const mediaStream = await googleMeetService.initializeMediaStream();
-        
-        if (!mounted) return;
-    
-        if (videoRef.current) {
+        if (mounted && videoRef.current) {
           videoRef.current.srcObject = mediaStream;
         }
       } catch (err) {
-        console.error('Failed to initialize meeting:', err);
+        console.error('Failed to initialize media:', err);
       }
     };
-
-    initializeMeeting();
-
+  
+    initializeMedia();
+  
+    // Only cleanup on unmount
     return () => {
       mounted = false;
     };
-  }, [user?.name, deviceType, currentMeeting, createMeeting]);
-
-  const handleToggleMute = (e) => {
-    e.preventDefault();
-    toggleMute(deviceType);
-  };
+  }, [currentMeeting, createMeeting, deviceType, user?.name]); 
 
   const handleToggleVideo = (e) => {
     e.preventDefault();
+    console.log('Current video state before toggle:', isVideoOff);
     toggleVideo(deviceType);
+  };
+  
+  const handleToggleMute = (e) => {
+    e.preventDefault();
+    console.log('Current audio state before toggle:', isMuted);
+    toggleMute(deviceType);
   };
 
   const handleEndCall = async (e) => {
