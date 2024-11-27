@@ -23,9 +23,15 @@ function Navigation() {
   return (
     <nav className="bg-slate-800/95 backdrop-blur-sm text-white fixed top-0 left-0 right-0 z-50">
       <div className="flex justify-between items-center p-4">
-        <h1 className="font-bold">Yuzu Meet</h1>
+        <div className="flex items-center">
+          <img 
+            src="/logo.png" 
+            alt="Yuzu Meet" 
+            className="h-8 w-8"  // Adjust size as needed
+          />
+          <span className="ml-2 font-bold">Meet</span>
+        </div>
         <div className="flex items-center space-x-6">
-          <Link to="/" className="hover:text-slate-300">Home</Link>
           <Link to="/glasses" className="hover:text-slate-300">Glasses</Link>
           <Link to="/wrist" className="hover:text-slate-300">Wrist</Link>
           <Link to="/ring" className="hover:text-slate-300">Ring</Link>
